@@ -1,4 +1,5 @@
 @startuml
+skinparam backgroundColor white
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
 skinparam linetype ortho
