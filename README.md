@@ -3,7 +3,8 @@
 Aplicação desktop desenvolvida em Java (Swing e arquitetura MVC) como atividade final da disciplina de **Programação Orientada a Objetos**. O sistema permite planejar despesas compartilhadas de atividades em grupo, calcular rateios fixos ou por pessoa com precisão de centavos, verificar limites de orçamento individuais, persistir dados via serialização binária e simular alternativas ótimas de corte de gastos opcionais.
 
 ## Requisitos de Ambiente
-* **JDK:** Java 17 ou superior (testado em JDK 17 e JDK 21 LTS).
+* **Versão Portátil para Windows (`CabeNoBolso-Windows.zip`):** Windows 10 ou 11 (64 bits). **Não requer Java instalado**, pois o ambiente de execução já acompanha o pacote.
+* **Executável `.jar` (`cabe-no-bolso.jar`) ou compilação pelo código-fonte:** JDK / JRE 17 ou superior (testado em JDK 17 e JDK 21 LTS).
 * **Dependências externas:** Nenhuma (utiliza exclusivamente bibliotecas nativas da plataforma Java SE e `javax.swing`).
 
 ## Organização das Pastas
@@ -22,29 +23,46 @@ cabe-no-bolso/
     └── test/                       # Bateria automatizada de testes de console
 ```
 
-## Instalação, Compilação e Execução
+## Instalação e Execução Rápida (Executáveis)
+
+Baixe a versão mais recente na aba **[Releases](https://github.com/Grupo16-POO/cabe-no-bolso/releases)** deste repositório e escolha uma das opções abaixo:
+
+### Opção 1: Pacote Portátil para Windows (`CabeNoBolso-Windows.zip`) — Recomendado no Windows
+1. Baixe o arquivo **`CabeNoBolso-Windows.zip`**.
+2. Clique com o botão direito sobre o arquivo baixado e selecione **Extrair Tudo...** para descompactar a pasta `CabeNoBolso` no local de sua preferência.
+3. Abra a pasta `CabeNoBolso` extraída e dê um duplo clique em **`CabeNoBolso.exe`** para iniciar o programa (não necessita instalação nem Java pré-instalado).
+
+### Opção 2: Executável Multiplataforma (`cabe-no-bolso.jar`) — Windows, Linux e macOS
+1. Certifique-se de ter o **Java 17 ou superior** instalado no computador.
+2. Baixe o arquivo **`cabe-no-bolso.jar`**.
+3. Dê um duplo clique sobre **`cabe-no-bolso.jar`** ou execute no terminal dentro da pasta onde o arquivo foi salvo:
+   ```bash
+   java -jar cabe-no-bolso.jar
+   ```
+
+## Compilação e Execução pelo Código-Fonte
 
 1. **Clone o repositório e acesse a pasta raiz do projeto:**
-```bash
-git clone [https://github.com/Grupo16-POO/cabe-no-bolso.git](https://github.com/Grupo16-POO/cabe-no-bolso.git)
-cd cabe-no-bolso
-```
+   ```bash
+   git clone [https://github.com/Grupo16-POO/cabe-no-bolso.git](https://github.com/Grupo16-POO/cabe-no-bolso.git)
+   cd cabe-no-bolso
+   ```
 
-2. **Compile e execute pela linha de comando:**
+2. **Compile os arquivos `.java` e inicie a aplicação:**
 
-* **Windows (PowerShell ou CMD):**
-```powershell
-mkdir bin -Force
-javac -encoding UTF-8 -d bin src\br\com\cabenobolso\model\*.java src\br\com\cabenobolso\persistence\*.java src\br\com\cabenobolso\controller\*.java src\br\com\cabenobolso\view\*.java src\br\com\cabenobolso\test\*.java
-java -cp bin br.com.cabenobolso.view.MainFrame
-```
+   * **Windows (PowerShell ou CMD):**
+     ```powershell
+     mkdir bin -Force
+     javac -encoding UTF-8 -d bin src\br\com\cabenobolso\model\*.java src\br\com\cabenobolso\persistence\*.java src\br\com\cabenobolso\controller\*.java src\br\com\cabenobolso\view\*.java src\br\com\cabenobolso\test\*.java
+     java -cp bin br.com.cabenobolso.view.MainFrame
+     ```
 
-* **Linux / macOS:**
-```bash
-mkdir -p bin
-javac -encoding UTF-8 -d bin src/br/com/cabenobolso/model/*.java src/br/com/cabenobolso/persistence/*.java src/br/com/cabenobolso/controller/*.java src/br/com/cabenobolso/view/*.java src/br/com/cabenobolso/test/*.java
-java -cp bin br.com.cabenobolso.view.MainFrame
-```
+   * **Linux / macOS:**
+     ```bash
+     mkdir -p bin
+     javac -encoding UTF-8 -d bin src/br/com/cabenobolso/model/*.java src/br/com/cabenobolso/persistence/*.java src/br/com/cabenobolso/controller/*.java src/br/com/cabenobolso/view/*.java src/br/com/cabenobolso/test/*.java
+     java -cp bin br.com.cabenobolso.view.MainFrame
+     ```
 
 ## Como Reproduzir os Testes
 
@@ -55,7 +73,7 @@ java -cp bin br.com.cabenobolso.test.ValidadorRegrasTest
 ```
 
 ### 2. Validação Manual na Interface Gráfica (`MainFrame`)
-1. Inicie a aplicação (`java -cp bin br.com.cabenobolso.view.MainFrame`).
+1. Inicie a aplicação (pelo executável ou via `java -cp bin br.com.cabenobolso.view.MainFrame`).
 2. Clique em **"Carregar Caso de Referência (Seção 4)"** na barra superior (ou clique em **"Carregar Planejamento (.dat)"** e abra `data/caso-referencia.dat`).
 3. Na aba **3. Resumo do Planejamento**, verifique os totais individuais: **Ana R$ 75,00** (excede R$ 5,00), **Bruno R$ 60,00** (no limite), **Carla R$ 75,00** (excede R$ 5,00) e **Custo Total R$ 210,00**.
 4. Para testar os demais cenários da Seção 4:
