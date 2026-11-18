@@ -27,3 +27,4 @@ sources.txt
 .vscode/
 .idea/
 *.iml
+dist/
