@@ -23,11 +23,11 @@ public class DespesaPorPessoa extends Despesa {
 
     @Override
     public Map<Participante, BigDecimal> calcularRateio() {
-        List<Participante> selecionadosOrdenados = new ArrayList<>(getParticipantes());
-        Collections.sort(selecionadosOrdenados);
+        List<Participante> lista = new ArrayList<>(getParticipantes());
+        Collections.sort(lista);
 
         Map<Participante, BigDecimal> rateio = new LinkedHashMap<>();
-        for (Participante p : selecionadosOrdenados) {
+        for (Participante p : lista) {
             rateio.put(p, getValor());
         }
         return rateio;
@@ -40,7 +40,5 @@ public class DespesaPorPessoa extends Despesa {
     }
 
     @Override
-    public String getTipoDescricao() {
-        return "Por pessoa";
-    }
+    public String getTipoDescricao() { return "Por pessoa"; }
 }
