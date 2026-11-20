@@ -23,38 +23,25 @@ public class DespesaFixa extends Despesa {
 
     @Override
     public Map<Participante, BigDecimal> calcularRateio() {
-        List<Participante> selecionadosOrdenados = new ArrayList<>(getParticipantes());
-        Collections.sort(selecionadosOrdenados); // Ordena pelo código crescente (Comparable)
+        List<Participante> lista = new ArrayList<>(getParticipantes());
+        Collections.sort(lista);
 
-        int quantidade = selecionadosOrdenados.size();
-        BigDecimal qtdBD = BigDecimal.valueOf(quantidade);
-
-        // Divisão inteira em centavos (arredondando para baixo)
+        int qtd = lista.size();
+        BigDecimal qtdBD = BigDecimal.valueOf(qtd);
         BigDecimal cotaBase = getValor().divide(qtdBD, 2, RoundingMode.DOWN);
-        BigDecimal totalBase = cotaBase.multiply(qtdBD);
-        BigDecimal sobra = getValor().subtract(totalBase);
-
-        int centavosRestantes = sobra.movePointRight(2).intValueExact();
+        int centavosRestantes = getValor().subtract(cotaBase.multiply(qtdBD)).movePointRight(2).intValueExact();
 
         Map<Participante, BigDecimal> rateio = new LinkedHashMap<>();
-        for (int i = 0; i < quantidade; i++) {
-            Participante p = selecionadosOrdenados.get(i);
-            BigDecimal parcela = cotaBase;
-            if (i < centavosRestantes) {
-                parcela = parcela.add(new BigDecimal("0.01"));
-            }
-            rateio.put(p, parcela.setScale(2, RoundingMode.UNNECESSARY));
+        for (int i = 0; i < qtd; i++) {
+            BigDecimal parcela = (i < centavosRestantes) ? cotaBase.add(new BigDecimal("0.01")) : cotaBase;
+            rateio.put(lista.get(i), parcela);
         }
         return rateio;
     }
 
     @Override
-    public BigDecimal getCustoTotal() {
-        return getValor();
-    }
+    public BigDecimal getCustoTotal() { return getValor(); }
 
     @Override
-    public String getTipoDescricao() {
-        return "Fixa";
-    }
+    public String getTipoDescricao() { return "Fixa"; }
 }
