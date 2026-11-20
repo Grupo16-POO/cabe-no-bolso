@@ -8,9 +8,13 @@ import br.com.cabenobolso.model.Participante;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
@@ -20,865 +24,444 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class MainFrame extends JFrame {
-    private static final Locale LOCALE_BR = Locale.forLanguageTag("pt-BR");
-    private static final NumberFormat MOEDA_FMT = NumberFormat.getCurrencyInstance(LOCALE_BR);
+public class MainFrame extends JFrame implements ActionListener, ListSelectionListener {
+    private static final NumberFormat MOEDA = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("pt-BR"));
+    private final PlanejamentoController controller = new PlanejamentoController();
 
-    private final PlanejamentoController controller;
+    // Barra superior
+    private JButton btnNovo, btnSalvar, btnCarregar, btnReferencia;
 
-    // --- Componentes Aba 1: Participantes ---
-    private JTextField txtPartCodigo;
-    private JTextField txtPartNome;
-    private JTextField txtPartOrcamento;
-    private DefaultTableModel modelParticipantes;
-    private JTable tblParticipantes;
+    // Aba 1: Participantes
+    private final JTextField txtCod = new JTextField(6), txtNome = new JTextField(18), txtOrc = new JTextField(10);
+    private JButton btnCadPart, btnEditPart, btnExcPart, btnLimpPart;
+    private DefaultTableModel modPart;
+    private JTable tblPart;
 
-    // --- Componentes Aba 2: Despesas ---
-    private JTextField txtDespDescricao;
-    private JTextField txtDespValor;
-    private JComboBox<String> cbDespTipo;
-    private JCheckBox chkDespEssencial;
-    private JSpinner spnDespPrioridade;
-    private JPanel pnlCheckboxesParticipantes;
-    private final Map<Integer, JCheckBox> mapaCheckboxes = new LinkedHashMap<>();
-    private DefaultTableModel modelDespesas;
-    private JTable tblDespesas;
+    // Aba 2: Despesas
+    private final JTextField txtDesc = new JTextField(18), txtVal = new JTextField(9);
+    private final JComboBox<String> cbTipo = new JComboBox<>(new String[]{"Fixa (divide entre selecionados)", "Por pessoa (valor unitário)"});
+    private final JCheckBox chkEssencial = new JCheckBox("Despesa Essencial (obrigatória no simulador)", true);
+    private final JSpinner spnPrio = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+    private final JPanel pnlChecks = new JPanel();
+    private final Map<Integer, JCheckBox> mapaChecks = new LinkedHashMap<>();
+    private JButton btnMarcarTodos, btnDesmarcarTodos, btnAddDesp, btnEditDesp, btnExcDesp, btnLimpDesp;
+    private DefaultTableModel modDesp;
+    private JTable tblDesp;
 
-    // --- Componentes Aba 3: Resumo ---
-    private JLabel lblCustoTotalGeral;
-    private JLabel lblQtdParticipantes;
-    private JLabel lblQtdDespesas;
-    private JLabel lblStatusGeral;
-    private DefaultTableModel modelResumoIndividual;
-    private JTable tblResumoIndividual;
-    private DefaultTableModel modelMatrizRateio;
-    private JTable tblMatrizRateio;
+    // Aba 3: Resumo
+    private JLabel lblResumoGeral;
+    private DefaultTableModel modResumoInd, modMatriz;
 
-    // --- Componentes Aba 4: Simulador (Bônus) ---
-    private JLabel lblStatusSimulador;
-    private JTextArea txtDetalhesSimulador;
-    private DefaultTableModel modelComparativoSimulador;
-    private JTable tblComparativoSimulador;
+    // Aba 4: Simulador (Bônus)
+    private JButton btnSimular;
+    private JLabel lblStatusSim;
+    private JTextArea txtDetalhesSim;
+    private DefaultTableModel modCompSim;
 
     public MainFrame() {
-        this.controller = new PlanejamentoController();
-        configurarJanela();
-        inicializarComponentes();
-        atualizarTodaInterface();
-    }
-
-    private void configurarJanela() {
         setTitle("Cabe no Bolso - Planejador de Despesas Compartilhadas");
-        setSize(1020, 700);
-        setMinimumSize(new Dimension(900, 620));
+        setSize(1000, 680);
+        setMinimumSize(new Dimension(880, 600));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(8, 8));
-    }
 
-    private void inicializarComponentes() {
-        add(criarBarraSuperior(), BorderLayout.NORTH);
+        // Barra Superior
+        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        barra.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
+        btnNovo = criarBotao("Novo Planejamento (Vazio)", barra);
+        btnSalvar = criarBotao("Salvar Planejamento (.dat)", barra);
+        btnCarregar = criarBotao("Carregar Planejamento (.dat)", barra);
+        btnReferencia = criarBotao("Carregar Caso de Referência (Seção 4)", barra);
+        btnReferencia.setFont(new Font("SansSerif", Font.BOLD, 12));
+        add(barra, BorderLayout.NORTH);
 
+        // Abas Principais
         JTabbedPane abas = new JTabbedPane();
         abas.setFont(new Font("SansSerif", Font.BOLD, 13));
-        abas.addTab("1. Participantes", criarAbaParticipantes());
-        abas.addTab("2. Despesas", criarAbaDespesas());
-        abas.addTab("3. Resumo do Planejamento", criarAbaResumo());
-        abas.addTab("4. Simulador de Alternativas (Bônus)", criarAbaSimulador());
-
+        abas.addTab("1. Participantes", montarAbaParticipantes());
+        abas.addTab("2. Despesas", montarAbaDespesas());
+        abas.addTab("3. Resumo do Planejamento", montarAbaResumo());
+        abas.addTab("4. Simulador de Alternativas (Bônus)", montarAbaSimulador());
         add(abas, BorderLayout.CENTER);
+
+        atualizarTelas();
     }
 
-    // =========================================================================
-    // BARRA SUPERIOR (ARQUIVO E CASO DE REFERÊNCIA)
-    // =========================================================================
-    private JPanel criarBarraSuperior() {
-        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
-        barra.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
+    private JPanel montarAbaParticipantes() {
+        JPanel painel = painelBase();
+        JPanel form = new JPanel(new GridLayout(2, 1, 4, 4));
+        form.setBorder(new TitledBorder("Cadastro e Edição de Participante"));
+        form.add(linha(new JLabel("Código Único:"), txtCod, new JLabel("Nome:"), txtNome, new JLabel("Orçamento (R$):"), txtOrc));
 
-        JButton btnNovo = new JButton("Novo Planejamento (Vazio)");
-        JButton btnSalvar = new JButton("Salvar Planejamento (.dat)");
-        JButton btnCarregar = new JButton("Carregar Planejamento (.dat)");
-        JButton btnReferencia = new JButton("Carregar Caso de Referência (Seção 4)");
+        JPanel botoes = linha();
+        btnCadPart = criarBotao("Cadastrar", botoes);
+        btnEditPart = criarBotao("Salvar Alterações do Selecionado", botoes);
+        btnExcPart = criarBotao("Excluir Selecionado", botoes);
+        btnLimpPart = criarBotao("Limpar Campos", botoes);
+        form.add(botoes);
 
-        btnReferencia.setFont(new Font("SansSerif", Font.BOLD, 12));
-
-        btnNovo.addActionListener(e -> acaoNovoPlanejamento());
-        btnSalvar.addActionListener(e -> acaoSalvarArquivo());
-        btnCarregar.addActionListener(e -> acaoCarregarArquivo());
-        btnReferencia.addActionListener(e -> acaoCarregarCasoReferencia());
-
-        barra.add(btnNovo);
-        barra.add(btnSalvar);
-        barra.add(btnCarregar);
-        barra.add(new JSeparator(SwingConstants.VERTICAL));
-        barra.add(btnReferencia);
-
-        return barra;
-    }
-
-    // =========================================================================
-    // ABA 1: PARTICIPANTES
-    // =========================================================================
-    private JPanel criarAbaParticipantes() {
-        JPanel painel = new JPanel(new BorderLayout(10, 10));
-        painel.setBorder(new EmptyBorder(12, 12, 12, 12));
-
-        // Formulário superior
-        JPanel pnlForm = new JPanel(new GridBagLayout());
-        pnlForm.setBorder(new TitledBorder("Cadastro e Edição de Participante"));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(6, 6, 6, 6);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        txtPartCodigo = new JTextField(8);
-        txtPartNome = new JTextField(22);
-        txtPartOrcamento = new JTextField(12);
-
-        gbc.gridx = 0; gbc.gridy = 0;
-        pnlForm.add(new JLabel("Código Único:"), gbc);
-        gbc.gridx = 1;
-        pnlForm.add(txtPartCodigo, gbc);
-
-        gbc.gridx = 2;
-        pnlForm.add(new JLabel("Nome:"), gbc);
-        gbc.gridx = 3; gbc.weightx = 1.0;
-        pnlForm.add(txtPartNome, gbc);
-
-        gbc.gridx = 4; gbc.weightx = 0;
-        pnlForm.add(new JLabel("Orçamento (R$):"), gbc);
-        gbc.gridx = 5;
-        pnlForm.add(txtPartOrcamento, gbc);
-
-        // Botões de ação
-        JPanel pnlBotoes = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        JButton btnCadastrar = new JButton("Cadastrar");
-        JButton btnEditar = new JButton("Salvar Alterações do Selecionado");
-        JButton btnExcluir = new JButton("Excluir Selecionado");
-        JButton btnLimpar = new JButton("Limpar Campos");
-
-        btnCadastrar.addActionListener(e -> acaoCadastrarParticipante());
-        btnEditar.addActionListener(e -> acaoEditarParticipante());
-        btnExcluir.addActionListener(e -> acaoExcluirParticipante());
-        btnLimpar.addActionListener(e -> limparCamposParticipante());
-
-        pnlBotoes.add(btnCadastrar);
-        pnlBotoes.add(btnEditar);
-        pnlBotoes.add(btnExcluir);
-        pnlBotoes.add(btnLimpar);
-
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 6;
-        pnlForm.add(pnlBotoes, gbc);
-
-        // Tabela de participantes
-        modelParticipantes = new DefaultTableModel(new String[]{"Código", "Nome", "Orçamento Disponível"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        tblParticipantes = new JTable(modelParticipantes);
-        tblParticipantes.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tblParticipantes.setRowHeight(24);
-
-        tblParticipantes.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting() && tblParticipantes.getSelectedRow() >= 0) {
-                int row = tblParticipantes.getSelectedRow();
-                int cod = (int) modelParticipantes.getValueAt(row, 0);
-                Participante p = buscarParticipanteLocal(cod);
-                if (p != null) {
-                    txtPartCodigo.setText(String.valueOf(p.getCodigo()));
-                    txtPartCodigo.setEditable(false);
-                    txtPartNome.setText(p.getNome());
-                    txtPartOrcamento.setText(p.getOrcamento().toPlainString().replace(".", ","));
-                }
-            }
-        });
-
-        JScrollPane scroll = new JScrollPane(tblParticipantes);
-        scroll.setBorder(new TitledBorder("Participantes Cadastrados (clique em uma linha para editar ou excluir)"));
-
-        painel.add(pnlForm, BorderLayout.NORTH);
-        painel.add(scroll, BorderLayout.CENTER);
+        modPart = novoModelo(new String[]{"Código", "Nome", "Orçamento Disponível"});
+        tblPart = novaTabela(modPart);
+        painel.add(form, BorderLayout.NORTH);
+        painel.add(comBorda(new JScrollPane(tblPart), "Participantes Cadastrados (clique na linha para editar/excluir)"), BorderLayout.CENTER);
         return painel;
     }
 
-    // =========================================================================
-    // ABA 2: DESPESAS
-    // =========================================================================
-    private JPanel criarAbaDespesas() {
-        JPanel painel = new JPanel(new BorderLayout(10, 10));
-        painel.setBorder(new EmptyBorder(12, 12, 12, 12));
+    private JPanel montarAbaDespesas() {
+        JPanel painel = painelBase();
+        spnPrio.setEnabled(false);
+        chkEssencial.addActionListener(this);
 
-        JPanel pnlSuperior = new JPanel(new BorderLayout(10, 10));
-        pnlSuperior.setBorder(new TitledBorder("Cadastro e Edição de Despesa"));
+        JPanel campos = new JPanel(new GridLayout(4, 1, 2, 2));
+        campos.add(linha(new JLabel("Descrição:"), txtDesc, new JLabel("Valor (R$):"), txtVal));
+        campos.add(linha(new JLabel("Tipo de Rateio:"), cbTipo));
+        campos.add(linha(chkEssencial, new JLabel("Prioridade (se opcional):"), spnPrio));
 
-        // Campos da esquerda
-        JPanel pnlCampos = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        JPanel botoes = linha();
+        btnAddDesp = criarBotao("Adicionar Despesa", botoes);
+        btnEditDesp = criarBotao("Salvar Alterações da Selecionada", botoes);
+        btnExcDesp = criarBotao("Excluir Selecionada", botoes);
+        btnLimpDesp = criarBotao("Limpar Campos", botoes);
+        campos.add(botoes);
 
-        txtDespDescricao = new JTextField(20);
-        txtDespValor = new JTextField(10);
-        cbDespTipo = new JComboBox<>(new String[]{"Fixa (divide entre selecionados)", "Por pessoa (valor unitário)"});
-        chkDespEssencial = new JCheckBox("Despesa Essencial (obrigatória no simulador)", true);
-        spnDespPrioridade = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
-        spnDespPrioridade.setEnabled(false);
+        pnlChecks.setLayout(new BoxLayout(pnlChecks, BoxLayout.Y_AXIS));
+        JPanel direita = new JPanel(new BorderLayout(4, 4));
+        direita.setBorder(new TitledBorder("Participantes Envolvidos"));
+        direita.setPreferredSize(new Dimension(280, 150));
+        direita.add(new JScrollPane(pnlChecks), BorderLayout.CENTER);
 
-        chkDespEssencial.addActionListener(e -> spnDespPrioridade.setEnabled(!chkDespEssencial.isSelected()));
+        JPanel rodapeChecks = linha();
+        btnMarcarTodos = criarBotao("Marcar Todos", rodapeChecks);
+        btnDesmarcarTodos = criarBotao("Desmarcar Todos", rodapeChecks);
+        direita.add(rodapeChecks, BorderLayout.SOUTH);
 
-        gbc.gridx = 0; gbc.gridy = 0;
-        pnlCampos.add(new JLabel("Descrição:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
-        pnlCampos.add(txtDespDescricao, gbc);
+        JPanel topo = new JPanel(new BorderLayout(8, 8));
+        topo.setBorder(new TitledBorder("Cadastro e Edição de Despesa"));
+        topo.add(campos, BorderLayout.CENTER);
+        topo.add(direita, BorderLayout.EAST);
 
-        gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0;
-        pnlCampos.add(new JLabel("Valor (R$):"), gbc);
-        gbc.gridx = 1;
-        pnlCampos.add(txtDespValor, gbc);
-
-        gbc.gridx = 0; gbc.gridy = 2;
-        pnlCampos.add(new JLabel("Tipo de Rateio:"), gbc);
-        gbc.gridx = 1;
-        pnlCampos.add(cbDespTipo, gbc);
-
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        pnlCampos.add(chkDespEssencial, gbc);
-
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 1;
-        pnlCampos.add(new JLabel("Prioridade (se opcional):"), gbc);
-        gbc.gridx = 1;
-        pnlCampos.add(spnDespPrioridade, gbc);
-
-        // Painel da direita: Seleção de participantes envolvidos
-        JPanel pnlDireita = new JPanel(new BorderLayout(4, 4));
-        pnlDireita.setBorder(new TitledBorder("Participantes Envolvidos na Despesa"));
-        pnlDireita.setPreferredSize(new Dimension(340, 170));
-
-        pnlCheckboxesParticipantes = new JPanel();
-        pnlCheckboxesParticipantes.setLayout(new BoxLayout(pnlCheckboxesParticipantes, BoxLayout.Y_AXIS));
-        JScrollPane scrollChecks = new JScrollPane(pnlCheckboxesParticipantes);
-
-        JPanel pnlAcoesChecks = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-        JButton btnMarcarTodos = new JButton("Marcar Todos");
-        JButton btnDesmarcarTodos = new JButton("Desmarcar Todos");
-        btnMarcarTodos.addActionListener(e -> mapaCheckboxes.values().forEach(cb -> cb.setSelected(true)));
-        btnDesmarcarTodos.addActionListener(e -> mapaCheckboxes.values().forEach(cb -> cb.setSelected(false)));
-        pnlAcoesChecks.add(btnMarcarTodos);
-        pnlAcoesChecks.add(btnDesmarcarTodos);
-
-        pnlDireita.add(scrollChecks, BorderLayout.CENTER);
-        pnlDireita.add(pnlAcoesChecks, BorderLayout.SOUTH);
-
-        // Botões inferiores do formulário
-        JPanel pnlBotoes = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        JButton btnAdicionar = new JButton("Adicionar Despesa");
-        JButton btnEditar = new JButton("Salvar Alterações da Selecionada");
-        JButton btnExcluir = new JButton("Excluir Selecionada");
-        JButton btnLimpar = new JButton("Limpar Campos");
-
-        btnAdicionar.addActionListener(e -> acaoAdicionarDespesa());
-        btnEditar.addActionListener(e -> acaoEditarDespesa());
-        btnExcluir.addActionListener(e -> acaoExcluirDespesa());
-        btnLimpar.addActionListener(e -> limparCamposDespesa());
-
-        pnlBotoes.add(btnAdicionar);
-        pnlBotoes.add(btnEditar);
-        pnlBotoes.add(btnExcluir);
-        pnlBotoes.add(btnLimpar);
-
-        pnlSuperior.add(pnlCampos, BorderLayout.CENTER);
-        pnlSuperior.add(pnlDireita, BorderLayout.EAST);
-        pnlSuperior.add(pnlBotoes, BorderLayout.SOUTH);
-
-        // Tabela de despesas
-        modelDespesas = new DefaultTableModel(
-                new String[]{"#", "Descrição", "Tipo", "Valor Informado", "Custo Total", "Classificação", "Participantes"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        tblDespesas = new JTable(modelDespesas);
-        tblDespesas.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tblDespesas.setRowHeight(24);
-
-        tblDespesas.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting() && tblDespesas.getSelectedRow() >= 0) {
-                carregarDespesaNoFormulario(tblDespesas.getSelectedRow());
-            }
-        });
-
-        JScrollPane scrollTabela = new JScrollPane(tblDespesas);
-        scrollTabela.setBorder(new TitledBorder("Despesas Lançadas (clique em uma linha para editar ou excluir)"));
-
-        painel.add(pnlSuperior, BorderLayout.NORTH);
-        painel.add(scrollTabela, BorderLayout.CENTER);
+        modDesp = novoModelo(new String[]{"#", "Descrição", "Tipo", "Valor Informado", "Custo Total", "Classificação", "Participantes"});
+        tblDesp = novaTabela(modDesp);
+        painel.add(topo, BorderLayout.NORTH);
+        painel.add(comBorda(new JScrollPane(tblDesp), "Despesas Lançadas (clique na linha para editar/excluir)"), BorderLayout.CENTER);
         return painel;
     }
 
-    // =========================================================================
-    // ABA 3: RESUMO DO PLANEJAMENTO
-    // =========================================================================
-    private JPanel criarAbaResumo() {
-        JPanel painel = new JPanel(new BorderLayout(10, 10));
-        painel.setBorder(new EmptyBorder(12, 12, 12, 12));
+    private JPanel montarAbaResumo() {
+        JPanel painel = painelBase();
+        lblResumoGeral = new JLabel("Custo Total: R$ 0,00 | Participantes: 0 | Despesas: 0", SwingConstants.CENTER);
+        lblResumoGeral.setFont(new Font("SansSerif", Font.BOLD, 14));
+        lblResumoGeral.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY), new EmptyBorder(10, 8, 10, 8)));
 
-        // Indicadores superiores
-        JPanel pnlCards = new JPanel(new GridLayout(1, 4, 10, 10));
-        lblCustoTotalGeral = criarLabelIndicador("Custo Total: R$ 0,00");
-        lblQtdParticipantes = criarLabelIndicador("Participantes: 0");
-        lblQtdDespesas = criarLabelIndicador("Despesas: 0");
-        lblStatusGeral = criarLabelIndicador("Situação: Sem dados");
+        modResumoInd = novoModelo(new String[]{"Código", "Participante", "Orçamento", "Total Individual", "Valor Excedido", "Situação"});
+        modMatriz = novoModelo(new String[]{});
 
-        pnlCards.add(lblCustoTotalGeral);
-        pnlCards.add(lblQtdParticipantes);
-        pnlCards.add(lblQtdDespesas);
-        pnlCards.add(lblStatusGeral);
-
-        // Tabela 1: Situação Individual em relação ao orçamento
-        modelResumoIndividual = new DefaultTableModel(
-                new String[]{"Código", "Participante", "Orçamento", "Total Individual", "Valor Excedido", "Situação"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        tblResumoIndividual = new JTable(modelResumoIndividual);
-        tblResumoIndividual.setRowHeight(24);
-        JScrollPane scrollIndividual = new JScrollPane(tblResumoIndividual);
-        scrollIndividual.setBorder(new TitledBorder("Situação Individual vs. Orçamento"));
-
-        // Tabela 2: Matriz detalhada (Pessoa x Despesa) igual à Seção 4
-        modelMatrizRateio = new DefaultTableModel() {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        tblMatrizRateio = new JTable(modelMatrizRateio);
-        tblMatrizRateio.setRowHeight(24);
-        JScrollPane scrollMatriz = new JScrollPane(tblMatrizRateio);
-        scrollMatriz.setBorder(new TitledBorder("Detalhamento do Rateio por Despesa (Valores em R$)"));
-
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scrollIndividual, scrollMatriz);
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                comBorda(new JScrollPane(novaTabela(modResumoInd)), "Situação Individual vs. Orçamento"),
+                comBorda(new JScrollPane(novaTabela(modMatriz)), "Detalhamento do Rateio por Despesa (Valores em R$)"));
         split.setResizeWeight(0.5);
 
-        painel.add(pnlCards, BorderLayout.NORTH);
+        painel.add(lblResumoGeral, BorderLayout.NORTH);
         painel.add(split, BorderLayout.CENTER);
         return painel;
     }
 
-    // =========================================================================
-    // ABA 4: SIMULADOR DE ALTERNATIVAS (BÔNUS - SEÇÃO 7)
-    // =========================================================================
-    private JPanel criarAbaSimulador() {
-        JPanel painel = new JPanel(new BorderLayout(10, 10));
-        painel.setBorder(new EmptyBorder(12, 12, 12, 12));
-
-        JPanel pnlTopo = new JPanel(new BorderLayout(10, 10));
-        JButton btnSimular = new JButton("Executar Simulação de Alternativas (Manter Essenciais + Maximizar Prioridade)");
+    private JPanel montarAbaSimulador() {
+        JPanel painel = painelBase();
+        JPanel topo = new JPanel(new BorderLayout(8, 8));
+        btnSimular = criarBotao("Executar Simulação de Alternativas (Manter Essenciais + Maximizar Prioridade)", null);
         btnSimular.setFont(new Font("SansSerif", Font.BOLD, 13));
-        btnSimular.addActionListener(e -> acaoExecutarSimulador());
+        lblStatusSim = new JLabel("Clique no botão acima para simular ajustes sem alterar o planejamento original.");
+        lblStatusSim.setFont(new Font("SansSerif", Font.BOLD, 13));
+        topo.add(btnSimular, BorderLayout.NORTH);
+        topo.add(lblStatusSim, BorderLayout.SOUTH);
 
-        lblStatusSimulador = new JLabel("Clique no botão acima para simular ajustes sem alterar o planejamento original.");
-        lblStatusSimulador.setFont(new Font("SansSerif", Font.BOLD, 13));
+        txtDetalhesSim = new JTextArea(8, 40);
+        txtDetalhesSim.setEditable(false);
+        txtDetalhesSim.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        modCompSim = novoModelo(new String[]{"Código", "Participante", "Orçamento", "Gasto Original", "Gasto Simulado", "Nova Situação"});
 
-        pnlTopo.add(btnSimular, BorderLayout.NORTH);
-        pnlTopo.add(lblStatusSimulador, BorderLayout.SOUTH);
-
-        txtDetalhesSimulador = new JTextArea(9, 40);
-        txtDetalhesSimulador.setEditable(false);
-        txtDetalhesSimulador.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        JScrollPane scrollDetalhes = new JScrollPane(txtDetalhesSimulador);
-        scrollDetalhes.setBorder(new TitledBorder("Despesas Mantidas e Retiradas na Simulação"));
-
-        modelComparativoSimulador = new DefaultTableModel(
-                new String[]{"Código", "Participante", "Orçamento", "Gasto Original", "Gasto Simulado", "Nova Situação"}, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        tblComparativoSimulador = new JTable(modelComparativoSimulador);
-        tblComparativoSimulador.setRowHeight(24);
-        JScrollPane scrollComparativo = new JScrollPane(tblComparativoSimulador);
-        scrollComparativo.setBorder(new TitledBorder("Comparativo Individual (Antes x Depois da Simulação)"));
-
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scrollDetalhes, scrollComparativo);
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                comBorda(new JScrollPane(txtDetalhesSim), "Despesas Mantidas e Retiradas na Simulação"),
+                comBorda(new JScrollPane(novaTabela(modCompSim)), "Comparativo Individual (Antes x Depois da Simulação)"));
         split.setResizeWeight(0.45);
 
-        painel.add(pnlTopo, BorderLayout.NORTH);
+        painel.add(topo, BorderLayout.NORTH);
         painel.add(split, BorderLayout.CENTER);
         return painel;
     }
 
     // =========================================================================
-    // AÇÕES DOS BOTÕES E EVENTOS
+    // EVENTOS DE CLIQUE E SELEÇÃO (SEM LAMBDAS)
     // =========================================================================
-    private void acaoNovoPlanejamento() {
-        int resp = JOptionPane.showConfirmDialog(this,
-                "Deseja iniciar um planejamento vazio? Os dados não salvos serão perdidos.",
-                "Novo Planejamento", JOptionPane.YES_NO_OPTION);
-        if (resp == JOptionPane.YES_OPTION) {
-            controller.novoPlanejamento();
-            limparCamposParticipante();
-            limparCamposDespesa();
-            limparTelaSimulador();
-            atualizarTodaInterface();
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        Object src = e.getSource();
+        if (src == chkEssencial) {
+            spnPrio.setEnabled(!chkEssencial.isSelected());
+        } else if (src == btnNovo) {
+            if (JOptionPane.showConfirmDialog(this, "Iniciar planejamento vazio? Dados não salvos serão perdidos.", "Novo", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+                controller.novoPlanejamento();
+                limparTudo();
+            }
+        } else if (src == btnSalvar) {
+            gerenciarArquivo(true);
+        } else if (src == btnCarregar) {
+            gerenciarArquivo(false);
+        } else if (src == btnReferencia) {
+            controller.carregarCasoReferencia();
+            limparTudo();
+            JOptionPane.showMessageDialog(this, "Caso de referência carregado (Ana, Bruno e Carla - Total R$ 210,00).");
+        } else if (src == btnCadPart) {
+            salvarParticipante(false);
+        } else if (src == btnEditPart) {
+            salvarParticipante(true);
+        } else if (src == btnExcPart) {
+            excluirItem(true);
+        } else if (src == btnLimpPart) {
+            limparPart();
+        } else if (src == btnMarcarTodos || src == btnDesmarcarTodos) {
+            for (JCheckBox cb : mapaChecks.values()) cb.setSelected(src == btnMarcarTodos);
+        } else if (src == btnAddDesp) {
+            salvarDespesa(false);
+        } else if (src == btnEditDesp) {
+            salvarDespesa(true);
+        } else if (src == btnExcDesp) {
+            excluirItem(false);
+        } else if (src == btnLimpDesp) {
+            limparDesp();
+        } else if (src == btnSimular) {
+            executarSimulador();
         }
     }
 
-    private void acaoSalvarArquivo() {
-        JFileChooser chooser = new JFileChooser(new File("data"));
-        chooser.setDialogTitle("Salvar Planejamento");
-        chooser.setFileFilter(new FileNameExtensionFilter("Arquivos de Planejamento (*.dat)", "dat"));
-        chooser.setSelectedFile(new File("meu-planejamento.dat"));
-
-        if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-            File arquivo = chooser.getSelectedFile();
-            String caminho = arquivo.getAbsolutePath();
-            if (!caminho.toLowerCase().endsWith(".dat")) {
-                caminho += ".dat";
+    @Override
+    public void valueChanged(ListSelectionEvent e) {
+        if (e.getValueIsAdjusting()) return;
+        if (e.getSource() == tblPart.getSelectionModel() && tblPart.getSelectedRow() >= 0) {
+            int cod = (int) modPart.getValueAt(tblPart.getSelectedRow(), 0);
+            for (Participante p : controller.listarParticipantes()) {
+                if (p.getCodigo() == cod) {
+                    txtCod.setText(String.valueOf(p.getCodigo()));
+                    txtCod.setEditable(false);
+                    txtNome.setText(p.getNome());
+                    txtOrc.setText(p.getOrcamento().toPlainString().replace(".", ","));
+                    break;
+                }
             }
+        } else if (e.getSource() == tblDesp.getSelectionModel() && tblDesp.getSelectedRow() >= 0) {
+            Despesa d = controller.listarDespesas().get(tblDesp.getSelectedRow());
+            txtDesc.setText(d.getDescricao());
+            txtVal.setText(d.getValor().toPlainString().replace(".", ","));
+            cbTipo.setSelectedIndex("Fixa".equalsIgnoreCase(d.getTipoDescricao()) ? 0 : 1);
+            chkEssencial.setSelected(d.isEssencial());
+            spnPrio.setEnabled(!d.isEssencial());
+            if (!d.isEssencial()) spnPrio.setValue(d.getPrioridade());
+            for (JCheckBox cb : mapaChecks.values()) cb.setSelected(false);
+            for (Participante p : d.getParticipantes()) {
+                if (mapaChecks.containsKey(p.getCodigo())) mapaChecks.get(p.getCodigo()).setSelected(true);
+            }
+        }
+    }
+
+    // =========================================================================
+    // OPERAÇÕES DO SISTEMA
+    // =========================================================================
+    private void gerenciarArquivo(boolean salvar) {
+        JFileChooser fc = new JFileChooser(new File("data"));
+        fc.setFileFilter(new FileNameExtensionFilter("Planejamento (*.dat)", "dat"));
+        if (salvar) fc.setSelectedFile(new File("meu-planejamento.dat"));
+
+        int op = salvar ? fc.showSaveDialog(this) : fc.showOpenDialog(this);
+        if (op == JFileChooser.APPROVE_OPTION) {
             try {
-                controller.salvarPlanejamento(caminho);
-                JOptionPane.showMessageDialog(this, "Planejamento salvo com sucesso em:\n" + caminho,
-                        "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                String path = fc.getSelectedFile().getAbsolutePath();
+                if (salvar) {
+                    if (!path.toLowerCase().endsWith(".dat")) path += ".dat";
+                    controller.salvarPlanejamento(path);
+                    JOptionPane.showMessageDialog(this, "Salvo com sucesso em:\n" + path);
+                } else {
+                    controller.carregarPlanejamento(path);
+                    limparTudo();
+                    JOptionPane.showMessageDialog(this, "Planejamento carregado com sucesso!");
+                }
             } catch (Exception ex) {
-                mostrarErro("Falha ao salvar arquivo: " + ex.getMessage());
+                erro("Erro no arquivo (dados atuais preservados):\n" + ex.getMessage());
             }
         }
     }
 
-    private void acaoCarregarArquivo() {
-        JFileChooser chooser = new JFileChooser(new File("data"));
-        chooser.setDialogTitle("Carregar Planejamento");
-        chooser.setFileFilter(new FileNameExtensionFilter("Arquivos de Planejamento (*.dat)", "dat"));
-
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            try {
-                controller.carregarPlanejamento(chooser.getSelectedFile().getAbsolutePath());
-                limparCamposParticipante();
-                limparCamposDespesa();
-                limparTelaSimulador();
-                atualizarTodaInterface();
-                JOptionPane.showMessageDialog(this, "Planejamento carregado com sucesso!",
-                        "Sucesso", JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                mostrarErro("Não foi possível carregar o arquivo selecionado.\nO planejamento atual foi preservado.\n\nDetalhe: " + ex.getMessage());
-            }
-        }
-    }
-
-    private void acaoCarregarCasoReferencia() {
-        controller.carregarCasoReferencia();
-        limparCamposParticipante();
-        limparCamposDespesa();
-        limparTelaSimulador();
-        atualizarTodaInterface();
-        JOptionPane.showMessageDialog(this,
-                "Caso de referência da Seção 4 carregado (Ana, Bruno e Carla - Total R$ 210,00).",
-                "Caso de Referência", JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private void acaoCadastrarParticipante() {
+    private void salvarParticipante(boolean editar) {
+        int row = tblPart.getSelectedRow();
+        if (editar && row < 0) { erro("Selecione um participante na tabela."); return; }
         try {
-            int codigo = Integer.parseInt(txtPartCodigo.getText().trim());
-            String nome = txtPartNome.getText();
-            BigDecimal orcamento = parseValorMonetario(txtPartOrcamento.getText());
-
-            controller.cadastrarParticipante(codigo, nome, orcamento);
-            limparCamposParticipante();
-            atualizarTodaInterface();
+            int cod = editar ? (int) modPart.getValueAt(row, 0) : Integer.parseInt(txtCod.getText().trim());
+            BigDecimal orc = parseValor(txtOrc.getText());
+            if (editar) controller.editarParticipante(cod, txtNome.getText(), orc);
+            else controller.cadastrarParticipante(cod, txtNome.getText(), orc);
+            limparPart();
+            atualizarTelas();
         } catch (NumberFormatException ex) {
-            mostrarErro("Informe um código inteiro válido e um orçamento numérico (ex: 70,00).");
+            erro("Código deve ser inteiro e orçamento numérico (ex: 70,00).");
         } catch (Exception ex) {
-            mostrarErro(ex.getMessage());
+            erro(ex.getMessage());
         }
     }
 
-    private void acaoEditarParticipante() {
-        int row = tblParticipantes.getSelectedRow();
-        if (row < 0) {
-            mostrarErro("Selecione um participante na tabela antes de salvar alterações.");
-            return;
-        }
+    private void salvarDespesa(boolean editar) {
+        int row = tblDesp.getSelectedRow();
+        if (editar && row < 0) { erro("Selecione uma despesa na tabela."); return; }
         try {
-            int codigo = (int) modelParticipantes.getValueAt(row, 0);
-            String novoNome = txtPartNome.getText();
-            BigDecimal novoOrcamento = parseValorMonetario(txtPartOrcamento.getText());
-
-            controller.editarParticipante(codigo, novoNome, novoOrcamento);
-            limparCamposParticipante();
-            atualizarTodaInterface();
+            String tipo = cbTipo.getSelectedIndex() == 0 ? "FIXA" : "POR_PESSOA";
+            BigDecimal val = parseValor(txtVal.getText());
+            boolean ess = chkEssencial.isSelected();
+            int prio = ess ? 0 : (Integer) spnPrio.getValue();
+            List<Integer> cods = new ArrayList<>();
+            for (Map.Entry<Integer, JCheckBox> item : mapaChecks.entrySet()) {
+                if (item.getValue().isSelected()) cods.add(item.getKey());
+            }
+            if (editar) controller.editarDespesa(row, tipo, txtDesc.getText(), val, cods, ess, prio);
+            else controller.cadastrarDespesa(tipo, txtDesc.getText(), val, cods, ess, prio);
+            limparDesp();
+            atualizarTelas();
         } catch (Exception ex) {
-            mostrarErro(ex.getMessage());
+            erro(ex.getMessage());
         }
     }
 
-    private void acaoExcluirParticipante() {
-        int row = tblParticipantes.getSelectedRow();
-        if (row < 0) {
-            mostrarErro("Selecione um participante na tabela para excluir.");
-            return;
-        }
+    private void excluirItem(boolean participante) {
+        JTable tbl = participante ? tblPart : tblDesp;
+        if (tbl.getSelectedRow() < 0) { erro("Selecione um item na tabela para excluir."); return; }
         try {
-            int codigo = (int) modelParticipantes.getValueAt(row, 0);
-            controller.excluirParticipante(codigo);
-            limparCamposParticipante();
-            atualizarTodaInterface();
+            if (participante) {
+                controller.excluirParticipante((int) modPart.getValueAt(tbl.getSelectedRow(), 0));
+                limparPart();
+            } else {
+                controller.excluirDespesa(tbl.getSelectedRow());
+                limparDesp();
+            }
+            atualizarTelas();
         } catch (Exception ex) {
-            mostrarErro(ex.getMessage());
+            erro(ex.getMessage());
         }
     }
 
-    private void acaoAdicionarDespesa() {
-        try {
-            String tipo = cbDespTipo.getSelectedIndex() == 0 ? "FIXA" : "POR_PESSOA";
-            String descricao = txtDespDescricao.getText();
-            BigDecimal valor = parseValorMonetario(txtDespValor.getText());
-            boolean essencial = chkDespEssencial.isSelected();
-            int prioridade = essencial ? 0 : (Integer) spnDespPrioridade.getValue();
-            List<Integer> selecionados = obterCodigosSelecionados();
-
-            controller.cadastrarDespesa(tipo, descricao, valor, selecionados, essencial, prioridade);
-            limparCamposDespesa();
-            atualizarTodaInterface();
-        } catch (Exception ex) {
-            mostrarErro(ex.getMessage());
-        }
-    }
-
-    private void acaoEditarDespesa() {
-        int row = tblDespesas.getSelectedRow();
-        if (row < 0) {
-            mostrarErro("Selecione uma despesa na tabela antes de salvar alterações.");
-            return;
-        }
-        try {
-            String tipo = cbDespTipo.getSelectedIndex() == 0 ? "FIXA" : "POR_PESSOA";
-            String descricao = txtDespDescricao.getText();
-            BigDecimal valor = parseValorMonetario(txtDespValor.getText());
-            boolean essencial = chkDespEssencial.isSelected();
-            int prioridade = essencial ? 0 : (Integer) spnDespPrioridade.getValue();
-            List<Integer> selecionados = obterCodigosSelecionados();
-
-            controller.editarDespesa(row, tipo, descricao, valor, selecionados, essencial, prioridade);
-            limparCamposDespesa();
-            atualizarTodaInterface();
-        } catch (Exception ex) {
-            mostrarErro(ex.getMessage());
-        }
-    }
-
-    private void acaoExcluirDespesa() {
-        int row = tblDespesas.getSelectedRow();
-        if (row < 0) {
-            mostrarErro("Selecione uma despesa na tabela para excluir.");
-            return;
-        }
-        controller.excluirDespesa(row);
-        limparCamposDespesa();
-        atualizarTodaInterface();
-    }
-
-    private void acaoExecutarSimulador() {
+    private void executarSimulador() {
         try {
             OtimizadorDespesas.ResultadoOtimizacao res = controller.executarSimulador();
-            Map<Participante, BigDecimal> totaisOriginais = controller.calcularTotaisIndividuais();
-
-            modelComparativoSimulador.setRowCount(0);
+            Map<Participante, BigDecimal> originais = controller.calcularTotaisIndividuais();
+            modCompSim.setRowCount(0);
             StringBuilder sb = new StringBuilder();
 
             if (!res.isViavel()) {
-                lblStatusSimulador.setText("RESULTADO: SEM SOLUÇÃO VIÁVEL (Essenciais excedem o orçamento)");
-                lblStatusSimulador.setForeground(new Color(180, 0, 0));
-
-                sb.append("MOTIVO DA INVIABILIDADE:\n");
-                sb.append(res.getMensagem()).append("\n\n");
-                sb.append("Nota: O planejamento original permaneceu inalterado.\n");
+                lblStatusSim.setText("SEM SOLUÇÃO VIÁVEL (Essenciais excedem o orçamento)");
+                lblStatusSim.setForeground(new Color(180, 0, 0));
+                sb.append("MOTIVO:\n").append(res.getMensagem()).append("\n\nO planejamento original permaneceu intacto.");
             } else {
-                lblStatusSimulador.setText("RESULTADO: SOLUÇÃO VIÁVEL ENCONTRADA! Novo Custo Geral: "
-                        + formatarMoeda(res.getNovoCustoTotalGeral()) + " (Prioridade acumulada: " + res.getSomaPrioridades() + ")");
-                lblStatusSimulador.setForeground(new Color(0, 120, 0));
-
-                sb.append("=== DESPESAS MANTIDAS ===\n");
+                lblStatusSim.setText("SOLUÇÃO VIÁVEL! Novo Custo Geral: " + MOEDA.format(res.getNovoCustoTotalGeral()) + " (Prioridade: " + res.getSomaPrioridades() + ")");
+                lblStatusSim.setForeground(new Color(0, 120, 0));
+                sb.append("=== MANTIDAS ===\n");
                 for (Despesa d : res.getDespesasMantidas()) {
-                    String tag = d.isEssencial() ? "[Essencial]" : "[Opcional - Prio " + d.getPrioridade() + "]";
-                    sb.append(String.format(" • %-25s | %-20s | Custo: %s%n",
-                            d.getDescricao(), tag, formatarMoeda(d.getCustoTotal())));
+                    sb.append(" • ").append(d.getDescricao()).append(" (").append(MOEDA.format(d.getCustoTotal())).append(")\n");
                 }
-
-                sb.append("\n=== DESPESAS RETIRADAS PARA CABER NO ORÇAMENTO ===\n");
-                if (res.getDespesasRetiradas().isEmpty()) {
-                    sb.append(" • Nenhuma despesa precisou ser retirada! Todas cabem no orçamento.\n");
-                } else {
-                    for (Despesa d : res.getDespesasRetiradas()) {
-                        sb.append(String.format(" • %-25s | [Opcional - Prio %d] | Economia: %s%n",
-                                d.getDescricao(), d.getPrioridade(), formatarMoeda(d.getCustoTotal())));
-                    }
+                sb.append("\n=== RETIRADAS ===\n");
+                if (res.getDespesasRetiradas().isEmpty()) sb.append(" • Nenhuma despesa retirada.\n");
+                for (Despesa d : res.getDespesasRetiradas()) {
+                    sb.append(" • ").append(d.getDescricao()).append(" [Prio ").append(d.getPrioridade()).append("] (-").append(MOEDA.format(d.getCustoTotal())).append(")\n");
                 }
             }
 
             for (Participante p : controller.listarParticipantes()) {
-                BigDecimal orig = totaisOriginais.get(p);
                 BigDecimal sim = res.getNovosTotaisIndividuais().get(p);
-                String sit = sim.compareTo(p.getOrcamento()) <= 0
-                        ? "Dentro do orçamento"
-                        : "Excede " + formatarMoeda(sim.subtract(p.getOrcamento()));
-
-                modelComparativoSimulador.addRow(new Object[]{
-                        p.getCodigo(), p.getNome(), formatarMoeda(p.getOrcamento()),
-                        formatarMoeda(orig), formatarMoeda(sim), sit
-                });
+                String sit = sim.compareTo(p.getOrcamento()) <= 0 ? "Dentro do orçamento" : "Excede " + MOEDA.format(sim.subtract(p.getOrcamento()));
+                modCompSim.addRow(new Object[]{p.getCodigo(), p.getNome(), MOEDA.format(p.getOrcamento()), MOEDA.format(originais.get(p)), MOEDA.format(sim), sit});
             }
-
-            txtDetalhesSimulador.setText(sb.toString());
+            txtDetalhesSim.setText(sb.toString());
         } catch (Exception ex) {
-            mostrarErro(ex.getMessage());
+            erro(ex.getMessage());
         }
     }
 
     // =========================================================================
-    // ATUALIZAÇÃO SINCRONIZADA DE TODAS AS TELAS
+    // ATUALIZAÇÃO E AUXILIARES
     // =========================================================================
-    private void atualizarTodaInterface() {
-        atualizarTabelaParticipantes();
-        atualizarCheckboxesParticipantes();
-        atualizarTabelaDespesas();
-        atualizarAbaResumo();
-    }
-
-    private void atualizarTabelaParticipantes() {
-        modelParticipantes.setRowCount(0);
-        for (Participante p : controller.listarParticipantes()) {
-            modelParticipantes.addRow(new Object[]{
-                    p.getCodigo(),
-                    p.getNome(),
-                    formatarMoeda(p.getOrcamento())
-            });
-        }
-    }
-
-    private void atualizarCheckboxesParticipantes() {
-        List<Integer> marcadosAtuais = obterCodigosSelecionados();
-        pnlCheckboxesParticipantes.removeAll();
-        mapaCheckboxes.clear();
-
-        for (Participante p : controller.listarParticipantes()) {
+    private void atualizarTelas() {
+        modPart.setRowCount(0);
+        pnlChecks.removeAll();
+        mapaChecks.clear();
+        List<Participante> parts = controller.listarParticipantes();
+        for (Participante p : parts) {
+            modPart.addRow(new Object[]{p.getCodigo(), p.getNome(), MOEDA.format(p.getOrcamento())});
             JCheckBox cb = new JCheckBox(p.getCodigo() + " - " + p.getNome());
-            cb.setSelected(marcadosAtuais.contains(p.getCodigo()));
-            mapaCheckboxes.put(p.getCodigo(), cb);
-            pnlCheckboxesParticipantes.add(cb);
+            mapaChecks.put(p.getCodigo(), cb);
+            pnlChecks.add(cb);
         }
+        pnlChecks.revalidate();
+        pnlChecks.repaint();
 
-        pnlCheckboxesParticipantes.revalidate();
-        pnlCheckboxesParticipantes.repaint();
-    }
-
-    private void atualizarTabelaDespesas() {
-        modelDespesas.setRowCount(0);
-        List<Despesa> despesas = controller.listarDespesas();
-        for (int i = 0; i < despesas.size(); i++) {
-            Despesa d = despesas.get(i);
-            String classificacao = d.isEssencial() ? "Essencial" : "Opcional (Prio " + d.getPrioridade() + ")";
-
+        modDesp.setRowCount(0);
+        List<Despesa> desps = controller.listarDespesas();
+        for (int i = 0; i < desps.size(); i++) {
+            Despesa d = desps.get(i);
             List<String> nomes = new ArrayList<>();
-            for (Participante p : d.getParticipantes()) {
-                nomes.add(p.getNome());
-            }
-
-            modelDespesas.addRow(new Object[]{
-                    i + 1,
-                    d.getDescricao(),
-                    d.getTipoDescricao(),
-                    formatarMoeda(d.getValor()),
-                    formatarMoeda(d.getCustoTotal()),
-                    classificacao,
-                    String.join(", ", nomes)
-            });
+            for (Participante p : d.getParticipantes()) nomes.add(p.getNome());
+            modDesp.addRow(new Object[]{i + 1, d.getDescricao(), d.getTipoDescricao(), MOEDA.format(d.getValor()),
+                    MOEDA.format(d.getCustoTotal()), d.isEssencial() ? "Essencial" : "Opcional (Prio " + d.getPrioridade() + ")", String.join(", ", nomes)});
         }
-    }
 
-    private void atualizarAbaResumo() {
-        List<Participante> participantes = controller.listarParticipantes();
-        List<Despesa> despesas = controller.listarDespesas();
         Map<Participante, BigDecimal> totais = controller.calcularTotaisIndividuais();
-        Map<Participante, BigDecimal> excedentes = controller.calcularExcedentes();
-        BigDecimal custoGeral = controller.calcularCustoTotalGeral();
-
-        lblCustoTotalGeral.setText("Custo Total: " + formatarMoeda(custoGeral));
-        lblQtdParticipantes.setText("Participantes: " + participantes.size());
-        lblQtdDespesas.setText("Despesas: " + despesas.size());
-
-        // 1. Tabela de situação individual
-        modelResumoIndividual.setRowCount(0);
-        int qtdExcedidos = 0;
-        for (Participante p : participantes) {
-            BigDecimal gasto = totais.get(p);
-            BigDecimal exc = excedentes.get(p);
-            String situacao;
-            if (exc.compareTo(BigDecimal.ZERO) > 0) {
-                situacao = "EXCEDE ORÇAMENTO (" + formatarMoeda(exc) + ")";
-                qtdExcedidos++;
-            } else if (gasto.compareTo(p.getOrcamento()) == 0 && gasto.compareTo(BigDecimal.ZERO) > 0) {
-                situacao = "Dentro do orçamento (no limite)";
-            } else {
-                situacao = "Dentro do orçamento";
-            }
-
-            modelResumoIndividual.addRow(new Object[]{
-                    p.getCodigo(),
-                    p.getNome(),
-                    formatarMoeda(p.getOrcamento()),
-                    formatarMoeda(gasto),
-                    formatarMoeda(exc),
-                    situacao
-            });
+        Map<Participante, BigDecimal> excs = controller.calcularExcedentes();
+        modResumoInd.setRowCount(0);
+        int acima = 0;
+        for (Participante p : parts) {
+            BigDecimal g = totais.get(p), ex = excs.get(p);
+            if (ex.compareTo(BigDecimal.ZERO) > 0) acima++;
+            String sit = ex.compareTo(BigDecimal.ZERO) > 0 ? "EXCEDE (" + MOEDA.format(ex) + ")"
+                    : (g.compareTo(p.getOrcamento()) == 0 && g.compareTo(BigDecimal.ZERO) > 0 ? "No limite" : "Dentro do orçamento");
+            modResumoInd.addRow(new Object[]{p.getCodigo(), p.getNome(), MOEDA.format(p.getOrcamento()), MOEDA.format(g), MOEDA.format(ex), sit});
         }
 
-        if (participantes.isEmpty()) {
-            lblStatusGeral.setText("Situação: Sem dados");
-            lblStatusGeral.setForeground(Color.DARK_GRAY);
-        } else if (qtdExcedidos > 0) {
-            lblStatusGeral.setText("Atenção: " + qtdExcedidos + " acima do limite");
-            lblStatusGeral.setForeground(new Color(180, 0, 0));
-        } else {
-            lblStatusGeral.setText("Situação: Cabe no bolso de todos!");
-            lblStatusGeral.setForeground(new Color(0, 120, 0));
-        }
+        lblResumoGeral.setText("Custo Total: " + MOEDA.format(controller.calcularCustoTotalGeral()) + "  |  Participantes: " + parts.size()
+                + "  |  Despesas: " + desps.size() + "  |  " + (acima > 0 ? "Atenção: " + acima + " acima do limite" : "Situação: OK"));
+        lblResumoGeral.setForeground(acima > 0 ? new Color(180, 0, 0) : new Color(0, 120, 0));
 
-        // 2. Matriz detalhada (Pessoa x Despesa)
-        List<String> colunasMatriz = new ArrayList<>();
-        colunasMatriz.add("Código");
-        colunasMatriz.add("Participante");
-        for (Despesa d : despesas) {
-            colunasMatriz.add(d.getDescricao());
-        }
-        colunasMatriz.add("Total Individual");
-
-        modelMatrizRateio.setDataVector(new Object[0][0], colunasMatriz.toArray());
-
-        for (Participante p : participantes) {
-            Object[] linha = new Object[colunasMatriz.size()];
+        List<String> cols = new ArrayList<>();
+        cols.add("Código");
+        cols.add("Participante");
+        for (Despesa d : desps) cols.add(d.getDescricao());
+        cols.add("Total Individual");
+        modMatriz.setDataVector(new Object[0][0], cols.toArray());
+        for (Participante p : parts) {
+            Object[] linha = new Object[cols.size()];
             linha[0] = p.getCodigo();
             linha[1] = p.getNome();
-
-            for (int j = 0; j < despesas.size(); j++) {
-                Map<Participante, BigDecimal> rateio = despesas.get(j).calcularRateio();
-                BigDecimal valorNaDespesa = rateio.getOrDefault(p, BigDecimal.ZERO);
-                linha[j + 2] = formatarMoeda(valorNaDespesa);
-            }
-            linha[colunasMatriz.size() - 1] = formatarMoeda(totais.get(p));
-            modelMatrizRateio.addRow(linha);
+            for (int j = 0; j < desps.size(); j++) linha[j + 2] = MOEDA.format(desps.get(j).calcularRateio().getOrDefault(p, BigDecimal.ZERO));
+            linha[cols.size() - 1] = MOEDA.format(totais.get(p));
+            modMatriz.addRow(linha);
         }
     }
 
-    // =========================================================================
-    // MÉTODOS AUXILIARES DE INTERFACE
-    // =========================================================================
-    private void carregarDespesaNoFormulario(int row) {
-        Despesa d = controller.listarDespesas().get(row);
-        txtDespDescricao.setText(d.getDescricao());
-        txtDespValor.setText(d.getValor().toPlainString().replace(".", ","));
-        cbDespTipo.setSelectedIndex("Fixa".equalsIgnoreCase(d.getTipoDescricao()) ? 0 : 1);
-        chkDespEssencial.setSelected(d.isEssencial());
-        spnDespPrioridade.setEnabled(!d.isEssencial());
-        if (!d.isEssencial()) {
-            spnDespPrioridade.setValue(d.getPrioridade());
-        }
+    private JPanel painelBase() { JPanel p = new JPanel(new BorderLayout(10, 10)); p.setBorder(new EmptyBorder(10, 10, 10, 10)); return p; }
+    private JPanel linha(Component... cs) { JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3)); for (Component c : cs) p.add(c); return p; }
+    private JComponent comBorda(JComponent c, String t) { c.setBorder(new TitledBorder(t)); return c; }
+    private JButton criarBotao(String t, Container pai) { JButton b = new JButton(t); b.addActionListener(this); if (pai != null) pai.add(b); return b; }
+    private DefaultTableModel novoModelo(String[] cols) { return new DefaultTableModel(cols, 0) { public boolean isCellEditable(int r, int c) { return false; } }; }
+    private JTable novaTabela(DefaultTableModel m) { JTable t = new JTable(m); t.setSelectionMode(ListSelectionModel.SINGLE_SELECTION); t.setRowHeight(24); t.getSelectionModel().addListSelectionListener(this); return t; }
 
-        mapaCheckboxes.values().forEach(cb -> cb.setSelected(false));
-        for (Participante p : d.getParticipantes()) {
-            JCheckBox cb = mapaCheckboxes.get(p.getCodigo());
-            if (cb != null) {
-                cb.setSelected(true);
-            }
-        }
-    }
+    private void limparTudo() { limparPart(); limparDesp(); txtDetalhesSim.setText(""); modCompSim.setRowCount(0); atualizarTelas(); }
+    private void limparPart() { txtCod.setText(""); txtCod.setEditable(true); txtNome.setText(""); txtOrc.setText(""); tblPart.clearSelection(); }
+    private void limparDesp() { txtDesc.setText(""); txtVal.setText(""); cbTipo.setSelectedIndex(0); chkEssencial.setSelected(true); spnPrio.setValue(1); spnPrio.setEnabled(false); tblDesp.clearSelection(); }
+    private void erro(String msg) { JOptionPane.showMessageDialog(this, msg, "Aviso / Validação", JOptionPane.ERROR_MESSAGE); }
 
-    private List<Integer> obterCodigosSelecionados() {
-        List<Integer> codigos = new ArrayList<>();
-        for (Map.Entry<Integer, JCheckBox> entry : mapaCheckboxes.entrySet()) {
-            if (entry.getValue().isSelected()) {
-                codigos.add(entry.getKey());
-            }
-        }
-        return codigos;
-    }
-
-    private Participante buscarParticipanteLocal(int codigo) {
-        for (Participante p : controller.listarParticipantes()) {
-            if (p.getCodigo() == codigo) {
-                return p;
-            }
-        }
-        return null;
-    }
-
-    private void limparCamposParticipante() {
-        txtPartCodigo.setText("");
-        txtPartCodigo.setEditable(true);
-        txtPartNome.setText("");
-        txtPartOrcamento.setText("");
-        tblParticipantes.clearSelection();
-    }
-
-    private void limparCamposDespesa() {
-        txtDespDescricao.setText("");
-        txtDespValor.setText("");
-        cbDespTipo.setSelectedIndex(0);
-        chkDespEssencial.setSelected(true);
-        spnDespPrioridade.setValue(1);
-        spnDespPrioridade.setEnabled(false);
-        mapaCheckboxes.values().forEach(cb -> cb.setSelected(false));
-        tblDespesas.clearSelection();
-    }
-
-    private void limparTelaSimulador() {
-        lblStatusSimulador.setText("Clique no botão acima para simular ajustes sem alterar o planejamento original.");
-        lblStatusSimulador.setForeground(Color.BLACK);
-        txtDetalhesSimulador.setText("");
-        modelComparativoSimulador.setRowCount(0);
-    }
-
-    private BigDecimal parseValorMonetario(String texto) {
-        if (texto == null || texto.trim().isEmpty()) {
-            throw new IllegalArgumentException("O campo de valor não pode ficar vazio.");
-        }
-        String limpo = texto.trim().replace("R$", "").replace(" ", "").replace(",", ".");
-        try {
-            return new BigDecimal(limpo);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Valor monetário inválido: '" + texto + "'. Use formato como 75,00.");
-        }
-    }
-
-    private String formatarMoeda(BigDecimal valor) {
-        return MOEDA_FMT.format(valor);
-    }
-
-    private JLabel criarLabelIndicador(String texto) {
-        JLabel lbl = new JLabel(texto, SwingConstants.CENTER);
-        lbl.setFont(new Font("SansSerif", Font.BOLD, 14));
-        lbl.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.LIGHT_GRAY),
-                new EmptyBorder(10, 8, 10, 8)
-        ));
-        return lbl;
-    }
-
-    private void mostrarErro(String mensagem) {
-        JOptionPane.showMessageDialog(this, mensagem, "Aviso / Validação", JOptionPane.ERROR_MESSAGE);
+    private BigDecimal parseValor(String txt) {
+        if (txt == null || txt.trim().isEmpty()) throw new IllegalArgumentException("O campo de valor não pode ficar vazio.");
+        try { return new BigDecimal(txt.trim().replace("R$", "").replace(" ", "").replace(",", ".")); }
+        catch (NumberFormatException e) { throw new IllegalArgumentException("Valor inválido: '" + txt + "'. Use formato como 75,00."); }
     }
 
     public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {
-        }
-        SwingUtilities.invokeLater(() -> new MainFrame().setVisible(true));
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) {}
+        SwingUtilities.invokeLater(new Runnable() { public void run() { new MainFrame().setVisible(true); } });
     }
 }
