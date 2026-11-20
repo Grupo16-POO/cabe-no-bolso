@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,37 +12,26 @@ import java.util.TreeMap;
 public class Planejamento implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    // TreeMap mantém os participantes automaticamente ordenados pelo código único
-    private final Map<Integer, Participante> participantes;
-    private final List<Despesa> despesas;
+    private final Map<Integer, Participante> participantes = new TreeMap<>();
+    private final List<Despesa> despesas = new ArrayList<>();
 
-    public Planejamento() {
-        this.participantes = new TreeMap<>();
-        this.despesas = new ArrayList<>();
-    }
-
-    public void adicionarParticipante(Participante participante) {
-        if (participante == null) {
-            throw new IllegalArgumentException("Participante inválido.");
+    public void adicionarParticipante(Participante p) {
+        if (p == null) throw new IllegalArgumentException("Participante inválido.");
+        if (participantes.containsKey(p.getCodigo())) {
+            throw new IllegalArgumentException("Já existe participante com o código " + p.getCodigo() + ".");
         }
-        if (participantes.containsKey(participante.getCodigo())) {
-            throw new IllegalArgumentException("Já existe um participante cadastrado com o código " + participante.getCodigo() + ".");
-        }
-        participantes.put(participante.getCodigo(), participante);
+        participantes.put(p.getCodigo(), p);
     }
 
     public void atualizarParticipante(int codigo, String novoNome, BigDecimal novoOrcamento) {
-        Participante p = buscarParticipantePorCodigo(codigo);
-        p.atualizarDados(novoNome, novoOrcamento);
+        buscarParticipantePorCodigo(codigo).atualizarDados(novoNome, novoOrcamento);
     }
 
     public void removerParticipante(int codigo) {
         Participante p = buscarParticipantePorCodigo(codigo);
         for (Despesa d : despesas) {
             if (d.getParticipantes().contains(p)) {
-                throw new IllegalStateException(
-                    "Não é possível excluir " + p.getNome() + " porque está vinculado(a) à despesa '" + d.getDescricao() + "'."
-                );
+                throw new IllegalStateException("Não é possível excluir " + p.getNome() + " pois está na despesa '" + d.getDescricao() + "'.");
             }
         }
         participantes.remove(codigo);
@@ -51,76 +39,50 @@ public class Planejamento implements Serializable {
 
     public Participante buscarParticipantePorCodigo(int codigo) {
         Participante p = participantes.get(codigo);
-        if (p == null) {
-            throw new IllegalArgumentException("Participante com código " + codigo + " não encontrado.");
-        }
+        if (p == null) throw new IllegalArgumentException("Participante com código " + codigo + " não encontrado.");
         return p;
     }
 
-    public List<Participante> getParticipantesOrdenados() {
-        return Collections.unmodifiableList(new ArrayList<>(participantes.values()));
-    }
+    public List<Participante> getParticipantesOrdenados() { return new ArrayList<>(participantes.values()); }
 
-    public void adicionarDespesa(Despesa despesa) {
-        if (despesa == null) {
-            throw new IllegalArgumentException("Despesa inválida.");
-        }
-        for (Participante p : despesa.getParticipantes()) {
+    public void adicionarDespesa(Despesa d) {
+        if (d == null) throw new IllegalArgumentException("Despesa inválida.");
+        for (Participante p : d.getParticipantes()) {
             if (!participantes.containsKey(p.getCodigo())) {
-                throw new IllegalArgumentException("Participante " + p.getNome() + " não pertence a este planejamento.");
+                throw new IllegalArgumentException("Participante " + p.getNome() + " não pertence ao planejamento.");
             }
         }
-        despesas.add(despesa);
+        despesas.add(d);
     }
 
-    public void substituirDespesa(int indice, Despesa novaDespesa) {
-        if (indice < 0 || indice >= despesas.size()) {
-            throw new IndexOutOfBoundsException("Índice de despesa inválido.");
-        }
-        if (novaDespesa == null) {
-            throw new IllegalArgumentException("Despesa inválida.");
-        }
-        despesas.set(indice, novaDespesa);
+    public void substituirDespesa(int indice, Despesa nova) {
+        if (indice < 0 || indice >= despesas.size()) throw new IndexOutOfBoundsException("Índice inválido.");
+        if (nova == null) throw new IllegalArgumentException("Despesa inválida.");
+        despesas.set(indice, nova);
     }
 
     public void removerDespesa(int indice) {
-        if (indice < 0 || indice >= despesas.size()) {
-            throw new IndexOutOfBoundsException("Índice de despesa inválido.");
-        }
+        if (indice < 0 || indice >= despesas.size()) throw new IndexOutOfBoundsException("Índice inválido.");
         despesas.remove(indice);
     }
 
-    public void removerDespesa(Despesa despesa) {
-        despesas.remove(despesa);
-    }
+    public void removerDespesa(Despesa d) { despesas.remove(d); }
+    public List<Despesa> getDespesas() { return new ArrayList<>(despesas); }
 
-    public List<Despesa> getDespesas() {
-        return Collections.unmodifiableList(despesas);
-    }
-
-    /**
-     * Retorna o total acumulado de cada participante cadastrado (zero para quem não participa de nenhuma despesa).
-     */
     public Map<Participante, BigDecimal> calcularTotaisIndividuais() {
         Map<Participante, BigDecimal> totais = new LinkedHashMap<>();
         for (Participante p : participantes.values()) {
             totais.put(p, BigDecimal.ZERO.setScale(2, RoundingMode.UNNECESSARY));
         }
-
         for (Despesa d : despesas) {
-            Map<Participante, BigDecimal> rateio = d.calcularRateio();
-            for (Map.Entry<Participante, BigDecimal> entry : rateio.entrySet()) {
-                Participante p = entry.getKey();
-                BigDecimal acumulado = totais.get(p).add(entry.getValue());
-                totais.put(p, acumulado);
+            for (Map.Entry<Participante, BigDecimal> item : d.calcularRateio().entrySet()) {
+                Participante p = item.getKey();
+                totais.put(p, totais.get(p).add(item.getValue()));
             }
         }
         return totais;
     }
 
-    /**
-     * Retorna o custo total de todas as despesas cadastradas.
-     */
     public BigDecimal calcularCustoTotalGeral() {
         BigDecimal total = BigDecimal.ZERO.setScale(2, RoundingMode.UNNECESSARY);
         for (Despesa d : despesas) {
@@ -129,21 +91,12 @@ public class Planejamento implements Serializable {
         return total;
     }
 
-    /**
-     * Retorna quanto cada participante excedeu do orçamento (R$ 0,00 se estiver dentro ou igual ao limite).
-     */
     public Map<Participante, BigDecimal> calcularExcedentes() {
         Map<Participante, BigDecimal> totais = calcularTotaisIndividuais();
         Map<Participante, BigDecimal> excedentes = new LinkedHashMap<>();
-
         for (Participante p : participantes.values()) {
-            BigDecimal gasto = totais.get(p);
-            BigDecimal diferenca = gasto.subtract(p.getOrcamento());
-            if (diferenca.compareTo(BigDecimal.ZERO) > 0) {
-                excedentes.put(p, diferenca);
-            } else {
-                excedentes.put(p, BigDecimal.ZERO.setScale(2, RoundingMode.UNNECESSARY));
-            }
+            BigDecimal diff = totais.get(p).subtract(p.getOrcamento());
+            excedentes.put(p, diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO.setScale(2, RoundingMode.UNNECESSARY));
         }
         return excedentes;
     }
