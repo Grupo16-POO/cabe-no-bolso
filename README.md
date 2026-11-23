@@ -85,3 +85,14 @@ java -cp bin br.com.cabenobolso.test.ValidadorRegrasTest
 ### 3. Simulador de Alternativas de Orçamento (Funcionalidade Extra)
 * **Cenário com solução ótima:** Com o caso de referência carregado, acesse a aba **4. Simulador de Alternativas (Bônus)** e clique em **"Executar Simulação de Alternativas"**. O algoritmo retira *Sobremesa* (prioridade 1) e mantém *Atividade recreativa* (prioridade 3), reduzindo os gastos para **Ana R$ 65,00**, **Bruno R$ 50,00**, **Carla R$ 65,00** (total **R$ 180,00**) sem alterar o planejamento original.
 * **Cenário sem solução:** Na aba **1. Participantes**, edite o orçamento de **Ana** para **R$ 40,00** e execute novamente o simulador na aba **4**. O sistema exibirá o alerta de inviabilidade detalhando que as despesas essenciais de Ana custam R$ 50,00 (excesso de R$ 10,00).
+
+## Autores (Grupo 16 — POO EAD Unifor)
+
+| Integrante |
+| :--- |
+| **David Andrius Souza Carneiro** |
+| **Francisco de Assis Chaves Brito** |
+| **João Pedro Alves Ferreira** |
+| **Mayara Bonates dos Santos Rodrigues** |
+| **Renan Victor Brito Aguiar Parente** |
+| **Sandra Regina Ximenes de Jesus** |
