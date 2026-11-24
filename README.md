@@ -77,9 +77,9 @@ java -cp bin br.com.cabenobolso.test.ValidadorRegrasTest
 2. Clique em **"Carregar Caso de Referência (Seção 4)"** na barra superior (ou clique em **"Carregar Planejamento (.dat)"** e abra `data/caso-referencia.dat`).
 3. Na aba **3. Resumo do Planejamento**, verifique os totais individuais: **Ana R$ 75,00** (excede R$ 5,00), **Bruno R$ 60,00** (no limite), **Carla R$ 75,00** (excede R$ 5,00) e **Custo Total R$ 210,00**.
 4. Para testar os demais cenários de validação:
-   - **Centavos no rateio:** Cadastre uma despesa *Fixa* de `100,00` selecionando os códigos `1`, `2` e `3` e confira o rateio `R\$ 33,34`, `R\$ 33,33` e `R\$ 33,33`.
-   - **Alteração de orçamento:** Na aba **1. Participantes**, selecione Ana, altere o orçamento para `80,00` e salve; na aba **3. Resumo**, o gasto permanece `R\$ 75,00` dentro do limite.
-   - **Exclusão de despesa:** Com o caso original carregado, exclua *"Atividade recreativa"* na aba **2. Despesas**; todos passam a gastar `R\$ 60,00` (total `R\$ 180,00`).
+   - **Centavos no rateio:** Cadastre uma despesa *Fixa* de `100,00` selecionando os códigos `1`, `2` e `3` e confira o rateio `R$ 33,34`, `R$ 33,33` e `R$ 33,33`.
+   - **Alteração de orçamento:** Na aba **1. Participantes**, selecione Ana, altere o orçamento para `80,00` e salve; na aba **3. Resumo**, o gasto permanece `R$ 75,00` dentro do limite.
+   - **Exclusão de despesa:** Com o caso original carregado, exclua *"Atividade recreativa"* na aba **2. Despesas**; todos passam a gastar `R$ 60,00` (total `R$ 180,00`).
    - **Persistência e falha de arquivo:** Salve em `.dat`, clique em *"Novo Planejamento (Vazio)"* e carregue o `.dat` salvo. Em seguida, tente carregar um arquivo `.txt` inválido e confirme que o planejamento em uso permanece intacto.
 
 ### 3. Simulador de Alternativas de Orçamento (Funcionalidade Extra)
