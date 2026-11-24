@@ -43,10 +43,10 @@ Baixe a versão mais recente na aba **[Releases](https://github.com/Grupo16-POO/
 ## Compilação e Execução pelo Código-Fonte
 
 1. **Clone o repositório e acesse a pasta raiz do projeto:**
-   ```bash
+   
    git clone [https://github.com/Grupo16-POO/cabe-no-bolso.git](https://github.com/Grupo16-POO/cabe-no-bolso.git)
    cd cabe-no-bolso
-   ```
+   
 
 2. **Compile os arquivos `.java` e inicie a aplicação:**
 
